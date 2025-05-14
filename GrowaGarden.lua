@@ -1,184 +1,154 @@
 --[[
-    Grow a Garden Utility GUI v1.0
+    Grow a Garden Utility GUI v1.1  (Kavo‑UI edition)
     Author: VSFlashGL (ChatGPT rewrite)
     Date: 2025‑05‑14
 
-    • Modern draggable GUI with tabs: Fly, Speed, Teleport
-    • Fly with adjustable speed & noclip
-    • WalkSpeed slider
-    • Four dynamic teleports (works by name‑search in Workspace)
-    • No auto‑farm / planting logic – stripped as requested
+    ▸ Draggable, minimalistic GUI built on Kavo UI Library (no TopbarPlus dependency)
+    ▸ Tabs: Fly, Speed, Teleport
+    ▸ Fly with adjustable speed & noclip
+    ▸ WalkSpeed slider
+    ▸ Four dynamic teleports resolved at runtime via Workspace search
 
-    Load with:
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/VSFlashGL/RobloxScriptsTest/main/GrowaGardenGUI.lua"))()
+    --------------------------------------------------------------
+    HOW TO LOAD:
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/VSFlashGL/RobloxScriptsTest/main/GrowaGarden.lua"))()
+
+    (Либо замените путь, если файл лежит под другим именем.)
 --]]
 
----------------------------------------------------------------------
--- ⚙️  SETTINGS (edit if you wish)
----------------------------------------------------------------------
-getgenv().FlyEnabled   = false
-getgenv().FlySpeed     = 100   -- default for slider (10‑200)
-getgenv().WalkSpeed    = 16    -- default for slider (16‑200)
----------------------------------------------------------------------
+-----------------------------------------------------------------
+-- ⚙️  SETTINGS ----------------------------------------------------
+-----------------------------------------------------------------
+getgenv().FlySpeed   = 100  -- default 10‑200
+getgenv().WalkSpeed  = 16   -- default 16‑200
+getgenv().FlyActive  = false
+-----------------------------------------------------------------
 
---// Services -------------------------------------------------------
-local Players       = game:GetService("Players")
-local UIS           = game:GetService("UserInputService")
-local RunService    = game:GetService("RunService")
+--// Services ------------------------------------------------------
+local Players     = game:GetService("Players")
+local UIS         = game:GetService("UserInputService")
+local RunService  = game:GetService("RunService")
+local Workspace   = game:GetService("Workspace")
 
-local LocalPlayer   = Players.LocalPlayer
-local Camera        = workspace.CurrentCamera
+local LP      = Players.LocalPlayer
+local Char    = LP.Character or LP.CharacterAdded:Wait()
+local Humanoid= Char:WaitForChild("Humanoid")
+local HRP     = Char:WaitForChild("HumanoidRootPart")
+local Camera  = Workspace.CurrentCamera
 
-local Character     = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local Humanoid      = Character:WaitForChild("Humanoid")
-local HRP           = Character:WaitForChild("HumanoidRootPart")
-
--- Keep character references up‑to‑date on respawn
-LocalPlayer.CharacterAdded:Connect(function(char)
-    Character = char
-    Humanoid  = char:WaitForChild("Humanoid")
-    HRP       = char:WaitForChild("HumanoidRootPart")
+LP.CharacterAdded:Connect(function(c)
+    Char     = c
+    Humanoid = c:WaitForChild("Humanoid")
+    HRP      = c:WaitForChild("HumanoidRootPart")
 end)
 
----------------------------------------------------------------------
--- 🖥️  UI LIBRARY (Rayfield, one‑liner)
----------------------------------------------------------------------
-local Rayfield = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Rayfield/main/source"))()
+-----------------------------------------------------------------
+-- 📚  LOAD KAVO UI LIBRARY ---------------------------------------
+-----------------------------------------------------------------
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
+local Window  = Library.CreateLib("🌱 Grow a Garden Utility", "Ocean")
 
-local Window = Rayfield:CreateWindow({
-    Name            = "🌱 Grow a Garden Utility GUI",
-    LoadingTitle    = "Grow a Garden Utility",
-    LoadingSubtitle = "Loading...",
-    ConfigurationSaving = {Enabled = false},
-})
+-----------------------------------------------------------------
+-- 🗂️  TABS & SECTIONS --------------------------------------------
+-----------------------------------------------------------------
+local FlyTab      = Window:NewTab("Fly")
+local FlySection  = FlyTab:NewSection("Flight Controls")
 
----------------------------------------------------------------------
--- 📂  TABS
----------------------------------------------------------------------
-local FlyTab      = Window:CreateTab("✈️ Fly", 4483362458)
-local SpeedTab    = Window:CreateTab("🏃 Speed", 4483362458)
-local TeleportTab = Window:CreateTab("🌍 Teleport", 4483362458)
+local SpeedTab    = Window:NewTab("Speed")
+local SpeedSection= SpeedTab:NewSection("Movement Speed")
 
----------------------------------------------------------------------
--- ✈️  FLY LOGIC -----------------------------------------------------
----------------------------------------------------------------------
+local TeleTab     = Window:NewTab("Teleport")
+local TeleSection = TeleTab:NewSection("Quick Travel")
+
+-----------------------------------------------------------------
+-- ✈️  FLY FUNCTIONS ----------------------------------------------
+-----------------------------------------------------------------
 local BV, BG, FlyConn, NoClipConn
 
 local function setNoClip(state)
     if state then
         if NoClipConn then return end
         NoClipConn = RunService.Stepped:Connect(function()
-            if getgenv().FlyEnabled and Character then
-                for _,part in ipairs(Character:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.CanCollide = false
-                    end
-                end
+            for _,v in ipairs(Char:GetDescendants()) do
+                if v:IsA("BasePart") then v.CanCollide = false end
             end
         end)
     elseif NoClipConn then
-        NoClipConn:Disconnect()
-        NoClipConn = nil
-        -- restore collisions
-        for _,part in ipairs(Character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = true
-            end
+        NoClipConn:Disconnect(); NoClipConn = nil
+        for _,v in ipairs(Char:GetDescendants()) do
+            if v:IsA("BasePart") then v.CanCollide = true end
         end
     end
 end
 
 local function startFly()
-    if BV then return end -- already flying
-
+    if BV then return end
     BV = Instance.new("BodyVelocity")
     BV.MaxForce = Vector3.new(1e6,1e6,1e6)
-    BV.P        = 12500
-    BV.Velocity = Vector3.zero
     BV.Parent   = HRP
 
     BG = Instance.new("BodyGyro")
     BG.MaxTorque = Vector3.new(1e6,1e6,1e6)
-    BG.P         = 12500
-    BG.CFrame    = HRP.CFrame
-    BG.Parent    = HRP
+    BG.Parent   = HRP
 
     Humanoid.PlatformStand = true
     setNoClip(true)
 
     FlyConn = RunService.RenderStepped:Connect(function()
         local dir = Vector3.zero
-        if UIS:IsKeyDown(Enum.KeyCode.W)          then dir += Camera.CFrame.LookVector      end
-        if UIS:IsKeyDown(Enum.KeyCode.S)          then dir -= Camera.CFrame.LookVector      end
-        if UIS:IsKeyDown(Enum.KeyCode.A)          then dir -= Camera.CFrame.RightVector     end
-        if UIS:IsKeyDown(Enum.KeyCode.D)          then dir += Camera.CFrame.RightVector     end
-        if UIS:IsKeyDown(Enum.KeyCode.Space)      then dir += Camera.CFrame.UpVector        end
-        if UIS:IsKeyDown(Enum.KeyCode.LeftControl)then dir -= Camera.CFrame.UpVector        end
-
+        if UIS:IsKeyDown(Enum.KeyCode.W) then dir += Camera.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.S) then dir -= Camera.CFrame.LookVector end
+        if UIS:IsKeyDown(Enum.KeyCode.A) then dir -= Camera.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.D) then dir += Camera.CFrame.RightVector end
+        if UIS:IsKeyDown(Enum.KeyCode.Space) then dir += Camera.CFrame.UpVector end
+        if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then dir -= Camera.CFrame.UpVector end
         if dir.Magnitude > 0 then dir = dir.Unit end
         BV.Velocity = dir * getgenv().FlySpeed
-        BG.CFrame   = CFrame.new(Vector3.new(), Camera.CFrame.LookVector)
+        BG.CFrame = Camera.CFrame
     end)
 end
 
 local function stopFly()
-    if FlyConn then FlyConn:Disconnect(); FlyConn = nil end
-    if BV then BV:Destroy(); BV = nil end
-    if BG then BG:Destroy(); BG = nil end
+    if FlyConn then FlyConn:Disconnect(); FlyConn=nil end
+    if BV then BV:Destroy(); BV=nil end
+    if BG then BG:Destroy(); BG=nil end
     setNoClip(false)
     Humanoid.PlatformStand = false
 end
 
----------------------------------------------------------------------
--- ✈️  FLY TAB UI ----------------------------------------------------
----------------------------------------------------------------------
-FlyTab:CreateToggle({
-    Name         = "Enable Fly",
-    CurrentValue = false,
-    Callback     = function(value)
-        getgenv().FlyEnabled = value
-        if value then startFly() else stopFly() end
-    end,
-})
+-----------------------------------------------------------------
+-- ✈️  FLY UI -------------------------------------------------------
+-----------------------------------------------------------------
+FlySection:NewToggle("Enable Fly", "Toggle flight mode", false, function(state)
+    getgenv().FlyActive = state
+    if state then startFly() else stopFly() end
+end)
 
-FlyTab:CreateSlider({
-    Name         = "Fly Speed",
-    Range        = {10, 200},
-    Increment    = 5,
-    Suffix       = "stud/s",
-    CurrentValue = getgenv().FlySpeed,
-    Callback     = function(val)
-        getgenv().FlySpeed = val
-    end,
-})
+FlySection:NewSlider("Fly Speed", "Adjust flight speed", 200, 10, function(val)
+    getgenv().FlySpeed = val
+end)
 
----------------------------------------------------------------------
--- 🏃  SPEED TAB UI --------------------------------------------------
----------------------------------------------------------------------
-SpeedTab:CreateSlider({
-    Name         = "WalkSpeed",
-    Range        = {16, 200},
-    Increment    = 1,
-    CurrentValue = getgenv().WalkSpeed,
-    Callback     = function(val)
-        getgenv().WalkSpeed = val
-        if Humanoid then Humanoid.WalkSpeed = val end
-    end,
-})
+-----------------------------------------------------------------
+-- 🏃  SPEED UI -----------------------------------------------------
+-----------------------------------------------------------------
+SpeedSection:NewSlider("WalkSpeed", "Character movement speed", 200, 16, function(val)
+    getgenv().WalkSpeed = val
+    if Humanoid then Humanoid.WalkSpeed = val end
+end)
 
----------------------------------------------------------------------
--- 🌍  TELEPORT TAB UI ----------------------------------------------
----------------------------------------------------------------------
+-----------------------------------------------------------------
+-- 🌍  TELEPORT UI --------------------------------------------------
+-----------------------------------------------------------------
 local Destinations = {
-    ["🌾 Go to Garden"] = {"Garden","Farm","FarmPlot","PlotArea"},
-    ["🌱 Seed Shop"]    = {"SeedShop","Seeds","ShopSeeds"},
-    ["🥚 Egg Shop"]     = {"EggShop","Eggs","ShopEggs"},
-    ["🎉 Event Area"]   = {"EventArea","Events","Event"},
+    ["🌾 Go to Garden"] = {"Garden","Farm","FarmPlot","PlotArea"},
+    ["🌱 Seed Shop"]   = {"SeedShop","Seeds","ShopSeeds","SeedStore"},
+    ["🥚 Egg Shop"]    = {"EggShop","Eggs","ShopEggs","EggStore"},
+    ["🎉 Event Area"]  = {"EventArea","Events","Event"},
 }
 
-local function findFirstBasePart(nameList)
-    for _,name in ipairs(nameList) do
-        local obj = workspace:FindFirstChild(name, true)
+local function findBasePart(list)
+    for _,name in ipairs(list) do
+        local obj = Workspace:FindFirstChild(name, true)
         if obj then
             if obj:IsA("BasePart") then return obj end
             if obj:IsA("Model") then
@@ -189,29 +159,22 @@ local function findFirstBasePart(nameList)
     end
 end
 
-local function teleportTo(nameList, label)
-    local target = findFirstBasePart(nameList)
-    if target and HRP then
-        HRP.CFrame = target.CFrame + Vector3.new(0, 5, 0)
-    else
-        Rayfield:Notify({Title="Teleport failed", Content="Couldn't find "..label, Duration=4})
-    end
-end
-
 for label, names in pairs(Destinations) do
-    TeleportTab:CreateButton({
-        Name     = label,
-        Callback = function()
-            teleportTo(names, label)
-        end,
-    })
+    TeleSection:NewButton(label, "", function()
+        local target = findBasePart(names)
+        if target and HRP then
+            HRP.CFrame = target.CFrame + Vector3.new(0,5,0)
+            Library:Notify("Teleported to " .. label)
+        else
+            Library:Notify("Target not found: " .. label)
+        end
+    end)
 end
 
----------------------------------------------------------------------
--- 🔄  INITIAL SET‑UP -----------------------------------------------
----------------------------------------------------------------------
+-----------------------------------------------------------------
+-- 🔄  INIT ---------------------------------------------------------
+-----------------------------------------------------------------
 Humanoid.WalkSpeed = getgenv().WalkSpeed
+Library:Notify("GUI loaded!")
 
-Rayfield:Notify({Title="Grow a Garden Utility", Content="GUI loaded!", Duration=5})
-
--- End of script ----------------------------------------------------
+-- END --
