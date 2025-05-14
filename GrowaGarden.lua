@@ -38,29 +38,29 @@ FlySec:NewToggle("Enable Fly", "Toggle flight mode", function(state)
         humanoid.PlatformStand = true
         -- Create BodyVelocity
         bodyVel = Instance.new("BodyVelocity")
-        bodyVel.MaxForce = Vector3.new(9e9,9e9,9e9)
-        bodyVel.Velocity = Vector3.new(0,0,0)
+        bodyVel.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+        bodyVel.Velocity = Vector3.new(0, 0, 0)
         bodyVel.Parent = hrp
         -- Create BodyGyro
         bodyGyro = Instance.new("BodyGyro")
-        bodyGyro.MaxTorque = Vector3.new(9e9,9e9,9e9)
+        bodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
         bodyGyro.CFrame = hrp.CFrame
         bodyGyro.Parent = hrp
         -- Bind movement
         RunService:BindToRenderStep("Fly", Enum.RenderPriority.Camera.Value, function()
             local cam = workspace.CurrentCamera
             local dir = Vector3.new()
-            if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + cam.CFrame.LookVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - cam.CFrame.LookVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir - cam.CFrame.RightVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir = dir + cam.CFrame.RightVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then dir = dir + Vector3.new(0,1,0) end
-            if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then dir = dir - Vector3.new(0,1,0) end
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir += cam.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir -= cam.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir -= cam.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir += cam.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then dir += Vector3.new(0, 1, 0) end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then dir -= Vector3.new(0, 1, 0) end
             if dir.Magnitude > 0 then
                 bodyVel.Velocity = dir.Unit * flySpeed
                 bodyGyro.CFrame = cam.CFrame
             else
-                bodyVel.Velocity = Vector3.new(0,0,0)
+                bodyVel.Velocity = Vector3.new(0, 0, 0)
             end
         end)
         Library:Notify("Flying enabled")
@@ -68,8 +68,8 @@ FlySec:NewToggle("Enable Fly", "Toggle flight mode", function(state)
         flying = false
         -- Unbind and cleanup
         RunService:UnbindFromRenderStep("Fly")
-        if bodyVel then bodyVel:Destroy() end
-        if bodyGyro then bodyGyro:Destroy() end
+        if bodyVel then bodyVel:Destroy(); bodyVel = nil end
+        if bodyGyro then bodyGyro:Destroy(); bodyGyro = nil end
         humanoid.PlatformStand = false
         -- Re-enable collisions
         for _, part in ipairs(char:GetDescendants()) do
@@ -81,14 +81,15 @@ FlySec:NewToggle("Enable Fly", "Toggle flight mode", function(state)
     end
 end)
 
--- Slider for flight speed\FlySec:NewSlider("Fly Speed", "Adjust flight speed", {10,200,true}, function(val)
+-- Slider for flight speed
+FlySec:NewSlider("Fly Speed", "Adjust flight speed", {10, 200, true}, function(val)
     flySpeed = val
 end)
 
 -- ===== SPEED TAB =====
 local SpeedTab = Window:NewTab("Speed")
 local SpeedSec = SpeedTab:NewSection("WalkSpeed")
-SpeedSec:NewSlider("Speed", "Change WalkSpeed", {16,200,true}, function(val)
+SpeedSec:NewSlider("Speed", "Change WalkSpeed", {16, 200, true}, function(val)
     humanoid.WalkSpeed = val
 end)
 
@@ -100,16 +101,16 @@ local TP_Sec = TP_Tab:NewSection("Destinations")
 local function teleportTo(keyword)
     local target
     for _, obj in ipairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") and string.find(obj.Name:lower(), keyword:lower()) then
+        if obj:IsA("BasePart") and obj.Name:lower():find(keyword:lower()) then
             target = obj
             break
         end
     end
     if target then
-        hrp.CFrame = target.CFrame + Vector3.new(0,3,0)
-        Library:Notify("Teleported to "..keyword)
+        hrp.CFrame = target.CFrame + Vector3.new(0, 3, 0)
+        Library:Notify("Teleported to " .. keyword)
     else
-        Library:Notify(keyword.." not found")
+        Library:Notify(keyword .. " not found")
     end
 end
 
@@ -126,5 +127,3 @@ end)
 TP_Sec:NewButton("Event Area", "Teleport to event area", function()
     teleportTo("event")
 end)
-
--- End of script
