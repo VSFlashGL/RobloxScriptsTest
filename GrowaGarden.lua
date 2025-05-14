@@ -1,43 +1,48 @@
---// Grow a Garden — Script Hub v3
+--// Grow a Garden — Script Hub  v4
 --// Created by: VSFlashGL  |  github.com/VSFlashGL/RobloxScriptsTest
 
 --------------------------------------------------------------------
--- 🖌️ UI-библиотека Kavo
+-- 🖌️  Kavo UI
 --------------------------------------------------------------------
 local Library = loadstring(
     game:HttpGet("https://raw.githubusercontent.com/xHeptco/Kavo-UI-Library/main/source.lua")
 )()
-
 local Window = Library.CreateLib("Grow a Garden | Script Hub", "Ocean")
 
 --------------------------------------------------------------------
--- 🔕  Функция-глушитель навязчивых скриптов
+-- 🔕  Watchdog, выключающий навязчивые скрипты
 --------------------------------------------------------------------
 local function suppressBadScripts()
-    local Players = game:GetService("Players")
-    local localPlr = Players.LocalPlayer
+    -- паттерны «вредных» имен
+    local BAD_PREFIXES = {
+        ["Bottom_UI.Framework"]    = true,
+        ["ThirdPartyUserService"]  = true,
+    }
 
-    task.spawn(function()
-        while task.wait(1) do
-            -- 1) Bottom_UI.Framework
-            local pg = localPlr:FindFirstChild("PlayerGui")
-            if pg then
-                local bottom = pg:FindFirstChild("Bottom_UI")
-                if bottom then
-                    local fw = bottom:FindFirstChild("Framework", true)
-                    if fw and fw:IsA("LocalScript") and fw.Enabled then
-                        fw.Disabled = true
-                    end
-                end
-            end
+    -- helper
+    local function isBad(ls)
+        if not ls:IsA("LocalScript") then return false end
+        for prefix in pairs(BAD_PREFIXES) do
+            if ls.Name:sub(1, #prefix) == prefix then return true end
+        end
+        return false
+    end
 
-            -- 2) скрипты в ThirdPartyUserService
-            local tps = game:GetService("ThirdPartyUserService")
-            for _, sc in ipairs(tps:GetChildren()) do
-                if sc:IsA("LocalScript") and sc.Enabled then
-                    sc.Disabled = true
+    -- обработка уже существующих
+    for _, d in ipairs(game:GetDescendants()) do
+        if isBad(d) and d.Enabled then
+            d.Disabled = true
+        end
+    end
+
+    -- реакция на новые
+    game.DescendantAdded:Connect(function(obj)
+        if isBad(obj) then
+            task.defer(function()
+                if obj:IsA("LocalScript") and obj.Enabled then
+                    obj.Disabled = true
                 end
-            end
+            end)
         end
     end)
 end
@@ -46,7 +51,7 @@ end
 -- 📑 TAB: SCRIPTS
 --------------------------------------------------------------------
 local scriptsTab     = Window:NewTab("Scripts")
-local scriptsSection = scriptsTab:NewSection("Choose a stable script:")
+local scriptsSection = scriptsTab:NewSection("Stable scripts:")
 
 local function runRemote(url, name)
     local ok, err = pcall(function()
@@ -55,7 +60,7 @@ local function runRemote(url, name)
 
     if ok then
         Library:Notify(name .. " loaded!", 3)
-        suppressBadScripts() -- сразу запускаем «сторожа», чтобы тихо глушить ошибки
+        suppressBadScripts() -- активируем «сторожа»
     else
         Library:Notify(("❌ %s error:\n%s"):format(name, err), 6)
     end
@@ -86,10 +91,9 @@ local infoSection = infoTab:NewSection("About")
 infoSection:NewLabel("Created by: VSFlashGL")
 infoSection:NewLabel("Script Hub for Grow a Garden")
 infoSection:NewLabel("GitHub: github.com/VSFlashGL/RobloxScriptsTest")
-infoSection:NewLabel("v3 — extra error-suppression inside Bottom_UI & TPS scripts")
+infoSection:NewLabel("v4 — watchdog disables Bottom_UI & ThirdPartyUserService clones")
 
 -- Kavo-UI окна перетаскиваются по умолчанию.
 --------------------------------------------------------------------
--- Готово!   Залейте файл как GrowaGardenHub.lua и вызывайте:
--- loadstring(game:HttpGet("https://raw.githubusercontent.com/VSFlashGL/RobloxScriptsTest/main/GrowaGardenHub.lua"))()
+-- Загрузка: loadstring(game:HttpGet("https://raw.githubusercontent.com/VSFlashGL/RobloxScriptsTest/main/GrowaGardenHub.lua"))()
 --------------------------------------------------------------------
